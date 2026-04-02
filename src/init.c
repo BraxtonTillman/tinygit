@@ -4,6 +4,7 @@
 #include "../include/init.h"
 #include <stdio.h>
 #include <sys/stat.h>
+#include <errno.h>
 #define MAX_PATH_LEN 256
 
 // FORWARD DECLARATIONS 
@@ -23,17 +24,28 @@ int tinygitInit(void) {
                          ".git/refs/heads/",
                          ".git/refs/tags/"};
   size_t num_directories = sizeof(directories) / sizeof(directories[0]);
+  int already_exists = 0;
 
   // Directory Creation
   for (size_t i = 0; i < num_directories; i++) {
 
     if (mkdir(directories[i], DIR_PERMS) == -1) {
-      perror("Error creating directory.");
-      return -1;
+      if (errno == EEXIST) {
+        already_exists = 1;
+      } 
+      else {
+        perror("Failed to create folder for a different reason.");
+        return -1;
+      }
     }
   }
 
-  printf("Directories created successfully.\n");
+  if (already_exists) {
+    printf("Reinitialized existing Git repository.\n");
+  }
+  else {
+    printf("Initialized empty Git repository.\n");
+  }
 
   // File Creation
   if (createInitFile("HEAD","ref: refs/heads/master") == -1) {

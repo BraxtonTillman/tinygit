@@ -5,6 +5,7 @@
 
 
 int main() {
-    tinygit_init();
+    tinygitInit();
+    tinygitInit();
     return 0;
 }
