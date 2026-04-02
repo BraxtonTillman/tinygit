@@ -1,0 +1,11 @@
+# Built binary
+tinygit
+
+# macOS debug symbols (from clang -g)
+*.dSYM/
+
+# Object files (if you add separate compile steps later)
+*.o
+
+# Local scratch repo for experimenting (not part of this project on GitHub)
+gittest/
