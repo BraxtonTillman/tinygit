@@ -1,11 +1,10 @@
 // main.c
 
-#include <stdio.h>
 #include "../include/init.h"
-
+#include <stdio.h>
 
 int main() {
-    tinygitInit();
-    tinygitInit();
-    return 0;
+  tinygitInit();
+  tinygitInit(); // Test reinitialize
+  return 0;
 }
