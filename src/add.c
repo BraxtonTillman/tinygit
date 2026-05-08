@@ -8,56 +8,103 @@
 */
 
 // PREPROCESSOR DIRECTIVES
+#include <_string.h>
 #include <openssl/sha.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zlib.h>
-// FORWARD DELCARATIONS
 
-// PRACTICE FUNCTION
-int main(int argc, char *argv[]) {
+unsigned char *read_file(const char *path, size_t *out_size);
+unsigned char *build_blob(unsigned char *file_contents, size_t file_size,
+                          size_t *out_blob_size);
+void hash_blob(const unsigned char *blob_buffer, size_t blob_size,
+               unsigned char *out_hash);
+void print_hash(unsigned char *out_hash);
+
+int main(int argc, char *argv[1]) {
+
   if (argc < 2) {
     printf("Not enough commands.");
     return 1;
   }
 
-  // Open a file
-  FILE *fp = fopen(argv[1], "rb");
-  if (fp == NULL) {
-    fprintf(stderr, "Could not open %s\n", argv[1]);
-    return 1;
-  }
+  size_t file_size;
+  size_t blob_size;
+  unsigned char hash[SHA_DIGEST_LENGTH];
+  unsigned char *file = read_file(argv[1], &file_size);
 
-  // Read its bytes into a buffer
-  fseek(fp, 0, SEEK_END); // jump to end
-  long size = ftell(fp);  // where im at == size
-  fseek(fp, 0, SEEK_SET); // go back to start
+  // TODO: call other functions, clean up mallocs, and test
+  unsigned char *blob = build_blob(file, file_size, &blob_size);
 
-  unsigned char *file_contents = malloc(size); // input buffer for SHA-1
-  unsigned char hash[SHA224_DIGEST_LENGTH];    // output buffer
-
-  size_t bytes_read = fread(file_contents, 1, size, fp);
-
-  SHA1((const unsigned char *)file_contents, bytes_read, hash);
-
-  // Print hex string
-  for (size_t i = 0; i < SHA224_DIGEST_LENGTH; i++) {
-    printf("%02x", hash[i]);
-  }
-  printf("\n");
+  hash_blob(blob, blob_size, hash);
+  print_hash(hash);
 
   // Cleanup
-  fclose(fp);
-  free(file_contents);
+  free(file);
+  free(blob);
 
   return 0;
 }
 
+unsigned char *read_file(const char *path, size_t *out_size) {
+  // Open file
+  FILE *fp = fopen(path, "rb");
+  if (fp == NULL) {
+    fprintf(stderr, "Could not open %s\n", path);
+    return NULL;
+  }
+
+  // Get size of file
+  fseek(fp, 0, SEEK_END);   // jump to end
+  long size_fp = ftell(fp); // where im at == size
+  fseek(fp, 0, SEEK_SET);   // go back to start
+
+  // Allocate buffer & read file bytes
+  unsigned char *file_contents_buffer = malloc(size_fp);
+  size_t bytes_read = fread(file_contents_buffer, 1, size_fp, fp);
+  *out_size = bytes_read;
+
+  fclose(fp);
+  return file_contents_buffer;
+}
+
+unsigned char *build_blob(unsigned char *file_contents, size_t file_size,
+                          size_t *out_blob_size) {
+  // Get header length and combine the header and content together
+  char blob_header[32];
+  size_t blob_header_len =
+      snprintf(blob_header, sizeof(blob_header), "blob %zu", file_size);
+
+  size_t header_size =
+      blob_header_len + 1; // +1 is accounting for the null byte
+
+  unsigned char *blob_buffer = malloc(header_size + file_size);
+
+  memcpy(blob_buffer, blob_header, header_size);
+  memcpy(blob_buffer + header_size, file_contents, file_size);
+
+  *out_blob_size = header_size + file_size;
+
+  return blob_buffer;
+}
+
+void hash_blob(const unsigned char *blob_buffer, size_t blob_size,
+               unsigned char *out_hash) {
+  SHA1(blob_buffer, blob_size, out_hash);
+}
+
+void print_hash(unsigned char *out_hash) {
+  for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+    printf("%02x", out_hash[i]);
+  }
+  printf("\n");
+}
+
 // WORKFLOW:
 /*  PART 1
-    1. Read file content into a buffer
+    1. Read file content into a buffer DONE
     2. Build the blob string: blob <size>\0<content>
     3. Hash that whole thing with SHA-1 which gives object ID.
     4. Zlib-compress that same blob string.
