@@ -9,9 +9,18 @@
 
 // PREPROCESSOR DIRECTIVES
 #include "../include/add.h"
+#include <errno.h>
+#include <math.h>
+#include <openssl/sha.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <zlib.h>
 #define OBJECT_PATH_LEN 64
 
-unsigned char *read_file(const char *path, size_t *out_size) {
+static unsigned char *read_file(const char *path, size_t *out_size) {
   // Open file
   FILE *fp = fopen(path, "rb");
   if (fp == NULL) {
@@ -26,6 +35,11 @@ unsigned char *read_file(const char *path, size_t *out_size) {
 
   // Allocate buffer & read file bytes
   unsigned char *file_contents_buffer = malloc(size_fp);
+  if (file_contents_buffer == NULL) {
+    fclose(fp);
+    return NULL;
+  }
+
   size_t bytes_read = fread(file_contents_buffer, 1, size_fp, fp);
   *out_size = bytes_read;
 
@@ -33,8 +47,8 @@ unsigned char *read_file(const char *path, size_t *out_size) {
   return file_contents_buffer;
 }
 
-unsigned char *build_blob(unsigned char *file_contents, size_t file_size,
-                          size_t *out_blob_size) {
+static unsigned char *build_blob(unsigned char *file_contents, size_t file_size,
+                                 size_t *out_blob_size) {
   // Get header length and combine the header and content together
   char blob_header[32];
   size_t blob_header_len =
@@ -44,6 +58,9 @@ unsigned char *build_blob(unsigned char *file_contents, size_t file_size,
       blob_header_len + 1; // +1 is accounting for the null byte
 
   unsigned char *blob_buffer = malloc(header_size + file_size);
+  if (blob_buffer == NULL) {
+    return NULL;
+  }
 
   memcpy(blob_buffer, blob_header, header_size);
   memcpy(blob_buffer + header_size, file_contents, file_size);
@@ -53,26 +70,20 @@ unsigned char *build_blob(unsigned char *file_contents, size_t file_size,
   return blob_buffer;
 }
 
-void hash_blob(const unsigned char *blob_buffer, size_t blob_size,
-               unsigned char *out_hash) {
+static void hash_blob(const unsigned char *blob_buffer, size_t blob_size,
+                      unsigned char *out_hash) {
   SHA1(blob_buffer, blob_size, out_hash);
 }
 
-void build_hash(char *out_hex_hash, unsigned char *out_hash) {
+static void build_hash(char *out_hex_hash, unsigned char *out_hash) {
   for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
     sprintf(out_hex_hash + (i * 2), "%02x", out_hash[i]);
   }
 }
 
-void print_hash(unsigned char *out_hash) {
-  for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
-    printf("%02x", out_hash[i]);
-  }
-  printf("\n");
-}
-
-unsigned char *compress_blob(const unsigned char *blob_buffer, size_t blob_size,
-                             size_t *out_compressed_size) {
+static unsigned char *compress_blob(const unsigned char *blob_buffer,
+                                    size_t blob_size,
+                                    size_t *out_compressed_size) {
   uLongf capacity = compressBound(blob_size);
 
   unsigned char *compressed_blob = malloc(capacity);
@@ -93,8 +104,8 @@ unsigned char *compress_blob(const unsigned char *blob_buffer, size_t blob_size,
   return compressed_blob;
 }
 
-void write_object(unsigned char *compressed_blob, size_t compressed_size,
-                  const char *hex_hash) {
+static void write_object(unsigned char *compressed_blob, size_t compressed_size,
+                         const char *hex_hash) {
 
   // Variables
   char first_hex[OBJECT_PATH_LEN];
@@ -128,20 +139,29 @@ int tinygitAdd(const char *path) {
   // Variables
   size_t file_size;
   size_t blob_size;
-  unsigned char hash[SHA_DIGEST_LENGTH];
-  unsigned char *file = read_file(path, &file_size);
-  char hex_hash[41];
   size_t compressed_size;
+  char hex_hash[41];
+  unsigned char hash[SHA_DIGEST_LENGTH];
+  unsigned char *file = NULL;
+  unsigned char *blob = NULL;
+  unsigned char *compressed_blob = NULL;
 
-  unsigned char *blob = build_blob(file, file_size, &blob_size);
+  file = read_file(path, &file_size);
+  if (file == NULL)
+    return -1;
+
+  blob = build_blob(file, file_size, &blob_size);
+  if (blob == NULL) {
+    free(file);
+    return -1;
+  }
 
   // Function Calls
   hash_blob(blob, blob_size, hash);
-  print_hash(hash);
+
   build_hash(hex_hash, hash);
 
-  unsigned char *compressed_blob =
-      compress_blob(blob, blob_size, &compressed_size);
+  compressed_blob = compress_blob(blob, blob_size, &compressed_size);
 
   write_object(compressed_blob, compressed_size, hex_hash);
 
