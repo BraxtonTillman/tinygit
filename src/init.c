@@ -1,20 +1,17 @@
 // init.c
 
-// PREPROCESSOR DIRECTIVES 
+// PREPROCESSOR DIRECTIVES
 #include "../include/init.h"
-#include <stdio.h>
-#include <sys/stat.h>
-#include <errno.h>
 #define MAX_PATH_LEN 256
 
-// FORWARD DECLARATIONS 
+// FORWARD DECLARATIONS
 static int createInitFile(const char *fileName, const char *fileContent);
 
-
-// This function creates the .git/ directory and all files and subdirectories inside
+// This function creates the .git/ directory and all files and subdirectories
+// inside
 int tinygitInit(void) {
 
-  // Variables 
+  // Variables
   const int DIR_PERMS = 0777;
   char *directories[] = {".git/",
                          ".git/objects/",
@@ -32,8 +29,7 @@ int tinygitInit(void) {
     if (mkdir(directories[i], DIR_PERMS) == -1) {
       if (errno == EEXIST) {
         already_exists = 1;
-      } 
-      else {
+      } else {
         perror("Failed to create folder for a different reason.");
         return -1;
       }
@@ -42,52 +38,52 @@ int tinygitInit(void) {
 
   if (already_exists) {
     printf("Reinitialized existing Git repository.\n");
-  }
-  else {
+  } else {
     printf("Initialized empty Git repository.\n");
   }
 
   // File Creation
-  if (createInitFile("HEAD","ref: refs/heads/master") == -1) {
+  if (createInitFile("HEAD", "ref: refs/heads/master") == -1) {
     return -1;
   }
 
-  if (createInitFile("description","Unnamed repository; edit this file 'description' to name the repository.") == -1) {
+  if (createInitFile("description", "Unnamed repository; edit this file "
+                                    "'description' to name the repository.") ==
+      -1) {
     return -1;
   }
 
-  if (createInitFile("config","[core]\n"
-	"\trepositoryformatversion = 0\n"
-	"\tfilemode = true\n"
-	"\tbare = false\n"
-	"\tlogallrefupdates = true\n"
-	"\tignorecase = true\n"
-	"\tprecomposeunicode = true\n") == -1) {
+  if (createInitFile("config", "[core]\n"
+                               "\trepositoryformatversion = 0\n"
+                               "\tfilemode = true\n"
+                               "\tbare = false\n"
+                               "\tlogallrefupdates = true\n"
+                               "\tignorecase = true\n"
+                               "\tprecomposeunicode = true\n") == -1) {
     return -1;
-  }  
-  
+  }
+
   return 0;
 }
 
-// This function creates the files and the content inside each file for the tinygitInit function
+// This function creates the files and the content inside each file for the
+// tinygitInit function
 static int createInitFile(const char *fileName, const char *fileContent) {
-  char path[MAX_PATH_LEN]; 
+  char path[MAX_PATH_LEN];
   FILE *fptr;
-  
+
   snprintf(path, sizeof(path), ".git/%s", fileName);
 
   fptr = fopen(path, "w");
 
   if (fptr != NULL) {
     fprintf(fptr, "%s", fileContent);
-  
+
     fclose(fptr);
 
-  }
-  else {
+  } else {
     perror("Error creating file.");
     return -1;
   }
   return 0;
-
 }
