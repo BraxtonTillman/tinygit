@@ -10,7 +10,6 @@
 // PREPROCESSOR DIRECTIVES
 #include "../include/add.h"
 #include <errno.h>
-#include <math.h>
 #include <openssl/sha.h>
 #include <stddef.h>
 #include <stdio.h>
