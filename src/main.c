@@ -2,10 +2,11 @@
 
 #include "../include/add.h"
 #include "../include/init.h"
+#include "../include/index.h"
 #include <stdio.h>
 #include <string.h>
 
-int main(int argc, char *argv[]) {
+/* int main(int argc, char *argv[]) {
   if (argc < 2) {
     printf("Not enough commands.\n");
     return -1;
@@ -19,5 +20,16 @@ int main(int argc, char *argv[]) {
     tinygitAdd(argv[2]);
   }
 
+  return 0;
+} */
+
+int main(void) {
+  struct Index idx = {0}; 
+  struct Entry e = {0};
+  stat("foo.txt", &e.st);
+  strcpy(e.path, "foo.txt");
+  idx.entries = &e;
+  idx.count = 1;
+  write_index("test.index", &idx);
   return 0;
 }
