@@ -30,6 +30,6 @@ int main(void) {
   strcpy(e.path, "foo.txt");
   idx.entries = &e;
   idx.count = 1;
-  write_index("test.index", &idx);
+  write_index(".git/index", &idx);
   return 0;
 }

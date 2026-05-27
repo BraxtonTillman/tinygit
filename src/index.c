@@ -13,10 +13,18 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <openssl/sha.h>
 
 int read_index(const char *path, struct Index *out_index);
 void add_entry(const struct Entry in_entry, struct Index *out_index);
+static void write_and_hash(const void *data, size_t len, FILE *fp, SHA_CTX *ctx) {
+      fwrite(data, 1, len, fp);
+      SHA1_Update(ctx, data, len);
+}
+
 int write_index(const char *path, const struct Index *index) {
+      SHA_CTX ctx;
+      unsigned char digest[20];
       uint32_t version = htonl(2);
       uint32_t count = htonl((uint32_t)(index->count));
       FILE *fp = fopen(path, "wb");
@@ -24,11 +32,14 @@ int write_index(const char *path, const struct Index *index) {
             fprintf(stderr,"Could not open %s\n", path);
             return -1;
       }
+      
+      // Initialize SHA state
+      SHA1_Init(&ctx);
 
       // Write the 12 byte header
-      fwrite("DIRC", 1, 4, fp);
-      fwrite(&version, sizeof(version), 1, fp);
-      fwrite(&count, sizeof(count), 1, fp);
+      write_and_hash("DIRC", 4, fp, &ctx);
+      write_and_hash(&version, sizeof(version), fp, &ctx);
+      write_and_hash(&count, sizeof(count), fp, &ctx);
       
       // loop entries
       for (size_t i = 0; i < index->count; i++) {
@@ -53,29 +64,28 @@ int write_index(const char *path, const struct Index *index) {
 
             uint16_t flags = htons(strlen(e->path) & 0xFFF);
             
-            fwrite(&ctime_sec, sizeof(ctime_sec), 1, fp);
-            fwrite(&ctime_nsec, sizeof(ctime_nsec), 1, fp);
-            fwrite(&mtime_sec, sizeof(mtime_sec), 1, fp);
-            fwrite(&mtime_nsec, sizeof(mtime_nsec), 1, fp);
-            fwrite(&dev, sizeof(dev), 1, fp);
-            fwrite(&ino, sizeof(ino), 1, fp);
-            fwrite(&mode, sizeof(mode), 1, fp);
-            fwrite(&uid, sizeof(uid), 1, fp);
-            fwrite(&gid, sizeof(gid), 1, fp);
-            fwrite(&file_size, sizeof(file_size), 1, fp); // 4 x 10
-            fwrite(e->sha1, 1, 20, fp); // 20
-            fwrite(&flags, sizeof(flags), 1, fp); // 2
-            fwrite(e->path, 1, name_len + 1, fp);
-            fwrite(zeros, 1, pad_len, fp);
+            write_and_hash(&ctime_sec, sizeof(ctime_sec), fp, &ctx);
+            write_and_hash(&ctime_nsec, sizeof(ctime_nsec), fp, &ctx);
+            write_and_hash(&mtime_sec, sizeof(mtime_sec), fp, &ctx);
+            write_and_hash(&mtime_nsec, sizeof(mtime_nsec), fp, &ctx);
+            write_and_hash(&dev, sizeof(dev), fp, &ctx);
+            write_and_hash(&ino, sizeof(ino), fp, &ctx);
+            write_and_hash(&mode, sizeof(mode), fp, &ctx);
+            write_and_hash(&uid, sizeof(uid), fp, &ctx);
+            write_and_hash(&gid, sizeof(gid), fp, &ctx);
+            write_and_hash(&file_size, sizeof(file_size), fp, &ctx);
+            write_and_hash(e->sha1, 20, fp, &ctx);
+            write_and_hash(&flags, sizeof(flags), fp, &ctx);
+            write_and_hash(e->path, name_len +1, fp, &ctx);
+            write_and_hash(zeros, pad_len, fp, &ctx);
+            
 
       }
 
-      /* TODO: add trailing 20 byte hash checksum
-               Create helper function to write and hash per fwrite
-               so like:
-               fwrite();
-               SHA1_Update() into one function for the for loop */
+      // add trailing 20 byte hash checksum
 
+      SHA1_Final(digest, &ctx);
+      fwrite(digest, 1, 20, fp);
 
       fclose(fp);
       return 0;
@@ -89,4 +99,3 @@ void free_index(struct Index *index){
       index->count = 0;
       index->capacity = 0;
 }
-
