@@ -7,15 +7,131 @@
          or modified in add.c.
 */
 
-#include "../include/index.h"
+#include "index.h"
 #include <stdio.h>
 #include <arpa/inet.h> // for htonl
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/sha.h>
+#include <errno.h>
 
-int read_index(const char *path, struct Index *out_index);
+static uint16_t read_be16(FILE *fp) {
+      uint16_t raw;
+      fread(&raw, 1, 2, fp);
+      return ntohs(raw);
+}
+static uint32_t read_be32(FILE *fp) {
+      uint32_t raw;
+      fread(&raw, 1, 4, fp);
+      return ntohl(raw);
+}
+
+int read_index(const char *path, struct Index *out_index) {
+      FILE *fp = fopen(path, "rb");
+      unsigned char sig_buff[4];
+      struct Entry *entries_buffer;
+      uint32_t version;
+      uint32_t count;
+      unsigned char DIRC[4] = {'D', 'I', 'R', 'C'};
+      size_t bytes_read;
+      
+      if (fp == NULL) {
+        if (errno == ENOENT) {
+           out_index->count = 0;
+           out_index->capacity = 0;
+           out_index->entries = NULL;
+           return 0;
+        }
+
+        fprintf(stderr, "No such file: %s\n", path);
+        return -1;
+      }
+
+      bytes_read = fread(sig_buff, 1, 4, fp);
+      if (bytes_read != 4) {
+            fprintf(stderr, "File being read is too short: %s\n", path);
+            fclose(fp);
+            return -1;
+      }
+
+      if (memcmp(sig_buff, DIRC, 4) != 0) {
+            fprintf(stderr, "FIle is corrupt: %s\n", path);
+            fclose(fp);
+            return -1;
+      }
+      
+      bytes_read = fread(&version, 1, 4, fp);
+      if (bytes_read != 4) {
+            fprintf(stderr, "File being read is too short: %s\n", path);
+            fclose(fp);
+            return -1;
+      }
+
+      version = ntohl(version); 
+
+      bytes_read = fread(&count, 1, 4, fp);
+      if (bytes_read != 4) {
+            fprintf(stderr, "File being read is too short: %s\n", path);
+            fclose(fp);
+            return -1;
+      }
+
+      count = ntohl(count);
+
+      if (count > 0) {
+            entries_buffer = malloc(count * sizeof(struct Entry));
+      } else {
+            entries_buffer = NULL;
+      }
+      if (entries_buffer == NULL) {
+            fprintf(stderr, "Out of memory reading index %s", path);
+            fclose(fp);
+            return -1; 
+      }
+      
+      out_index->entries = entries_buffer;
+      out_index->count = count;
+      out_index->capacity = count;
+
+      for (size_t i = 0; i < count; i++) {
+            struct Entry *e = &entries_buffer[i];
+            
+            uint16_t flags;
+
+            size_t name_len;
+            size_t entry_len;
+            size_t pad_len;
+
+            e->st.st_ctimespec.tv_sec = read_be32(fp);
+            e->st.st_ctimespec.tv_nsec = read_be32(fp);
+            e->st.st_mtimespec.tv_sec = read_be32(fp);
+            e->st.st_mtimespec.tv_nsec = read_be32(fp);
+            e->st.st_dev = read_be32(fp);
+            e->st.st_ino = read_be32(fp);
+            e->st.st_mode = read_be32(fp);
+            e->st.st_uid = read_be32(fp);
+            e->st.st_gid = read_be32(fp);
+            e->st.st_size = read_be32(fp);
+
+            fread(e->sha1, 1, 20, fp);
+
+            flags = read_be16(fp);
+            
+            name_len = flags & 0xFFF;
+            entry_len = 62 + name_len + 1;
+            pad_len = 8 - (entry_len % 8);
+
+            fread(e->path, 1, name_len + 1, fp);
+
+            fseek(fp, pad_len, SEEK_CUR);
+            
+      }
+
+      fclose(fp);
+      return 0;
+}
+
 void add_entry(const struct Entry in_entry, struct Index *out_index);
 static void write_and_hash(const void *data, size_t len, FILE *fp, SHA_CTX *ctx) {
       fwrite(data, 1, len, fp);

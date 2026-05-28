@@ -8,7 +8,7 @@
 */
 
 // PREPROCESSOR DIRECTIVES
-#include "../include/add.h"
+#include "add.h"
 #include <errno.h>
 #include <openssl/sha.h>
 #include <stddef.h>

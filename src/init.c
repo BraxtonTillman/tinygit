@@ -1,7 +1,7 @@
 // init.c
 
 // PREPROCESSOR DIRECTIVES
-#include "../include/init.h"
+#include "init.h"
 #define MAX_PATH_LEN 256
 
 // FORWARD DECLARATIONS

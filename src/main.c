@@ -23,7 +23,7 @@
   return 0;
 } */
 
-int main(void) {
+ /* int main(void) {
   struct Index idx = {0}; 
   struct Entry e = {0};
   stat("foo.txt", &e.st);
@@ -32,4 +32,11 @@ int main(void) {
   idx.count = 1;
   write_index(".git/index", &idx);
   return 0;
+} */
+
+int main(void) {
+  struct Index idx = {0};
+  read_index(".git/index", &idx);
+  write_index("roundtrip.index",&idx);
+  free_index(&idx);
 }
