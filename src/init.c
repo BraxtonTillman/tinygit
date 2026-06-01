@@ -1,7 +1,7 @@
 // init.c
 
 // PREPROCESSOR DIRECTIVES
-#include "init.h"
+#include "../include/init.h"
 #define MAX_PATH_LEN 256
 
 // FORWARD DECLARATIONS
@@ -47,9 +47,9 @@ int tinygitInit(void) {
     return -1;
   }
 
-  if (createInitFile("description", "Unnamed repository; edit this file "
-                                    "'description' to name the repository.") ==
-      -1) {
+  if (createInitFile("description",
+                     "Unnamed repository; edit this file "
+                     "'description' to name the repository.") == -1) {
     return -1;
   }
 

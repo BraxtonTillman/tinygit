@@ -7,13 +7,5 @@ tinygit
 # Object files (if you add separate compile steps later)
 *.o
 
-# Built add command (binary next to add.c; do not commit)
-src/add
-
-# Local scratch repo for experimenting (not part of this project on GitHub)
-gittest/
-
-
-test.txt
-foo.txt
-test.index
+/tmp
+/gittest
