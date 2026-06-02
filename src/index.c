@@ -9,6 +9,7 @@
 
 #include "../include/index.h"
 #include <arpa/inet.h>
+#include <assert.h>
 #include <errno.h>
 #include <openssl/sha.h>
 #include <stdint.h>
@@ -130,13 +131,16 @@ int read_index(const char *path, struct Index *out_index) {
       free(entries_buffer);
       return -1;
     }
+
     bytes_read = fread(e->path, 1, name_len + 1, fp);
+
     if (bytes_read != name_len + 1) {
       fprintf(stderr, "Truncated index: %s\n", path);
       fclose(fp);
       free(entries_buffer);
       return -1;
     }
+
     fseek(fp, pad_len, SEEK_CUR);
   }
 
@@ -144,7 +148,33 @@ int read_index(const char *path, struct Index *out_index) {
   return 0;
 }
 
-void add_entry(const struct Entry in_entry, struct Index *out_index) {}
+int add_entry(const struct Entry *in_entry, struct Index *out_index) {
+  assert(in_entry != NULL);
+
+  for (size_t i = 0; i < out_index->count; i++) {
+    if (strcmp(in_entry->path, out_index->entries[i].path) == 0) {
+      out_index->entries[i] = *in_entry;
+      return 0;
+    }
+  }
+
+  if (out_index->count == out_index->capacity) {
+    size_t new_capacity =
+        (out_index->capacity == 0) ? 4 : out_index->capacity * 2;
+    struct Entry *temp =
+        realloc(out_index->entries, new_capacity * sizeof(struct Entry));
+    if (temp == NULL) {
+      fprintf(stderr,
+              "Reallocation failed! Original memory is still intact.\n");
+      return -1;
+    }
+    out_index->entries = temp;
+    out_index->capacity = new_capacity;
+  }
+  out_index->entries[out_index->count] = *in_entry;
+  out_index->count++;
+  return 0;
+}
 static void write_and_hash(const void *data, size_t len, FILE *fp,
                            SHA_CTX *ctx) {
   fwrite(data, 1, len, fp);
