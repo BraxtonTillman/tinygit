@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
   if (argc < 2) {
     printf("Not enough commands.\n");
     return -1;
@@ -21,7 +21,7 @@
   }
 
   return 0;
-} */
+}
 
 /* int main(void) {
  struct Index idx = {0};
@@ -41,7 +41,7 @@
   free_index(&idx);
 } */
 
-int main(void) {
+/* int main(void) {
   struct Index idx = {.entries = NULL, .count = 0, .capacity = 0};
 
   struct Entry a = {0}; // {0} zeroes the whole struct — stat, sha1, all of it
@@ -84,4 +84,4 @@ int main(void) {
 
   free_index(&idx); // and run the whole thing under valgrind
   return 0;
-}
+} */

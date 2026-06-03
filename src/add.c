@@ -9,6 +9,7 @@
 
 // PREPROCESSOR DIRECTIVES
 #include "../include/add.h"
+#include "../include/index.h"
 #include <errno.h>
 #include <openssl/sha.h>
 #include <stddef.h>
@@ -17,7 +18,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <zlib.h>
-#define OBJECT_PATH_LEN 64
+#define MAX_OBJECT_PATH_LEN_REST_HEX 64
+#define MAX_OBJECT_PATH_LEN_FIRST_HEX 20
+#define DIR_PERMS 0777
 
 static unsigned char *read_file(const char *path, size_t *out_size) {
   // Open file
@@ -32,8 +35,14 @@ static unsigned char *read_file(const char *path, size_t *out_size) {
   long size_fp = ftell(fp); // where im at == size
   fseek(fp, 0, SEEK_SET);   // go back to start
 
+  if (size_fp < 0) {
+    fprintf(stderr, "Size of file is NULL.\n");
+    fclose(fp);
+    return NULL;
+  }
+
   // Allocate buffer & read file bytes
-  unsigned char *file_contents_buffer = malloc(size_fp);
+  unsigned char *file_contents_buffer = malloc(size_fp + 1);
   if (file_contents_buffer == NULL) {
     fclose(fp);
     return NULL;
@@ -41,6 +50,13 @@ static unsigned char *read_file(const char *path, size_t *out_size) {
 
   size_t bytes_read = fread(file_contents_buffer, 1, size_fp, fp);
   *out_size = bytes_read;
+
+  if (bytes_read != (size_t)size_fp) {
+    fprintf(stderr, "Blob object was partially hashed. Re-run command.\n");
+    free(file_contents_buffer);
+    fclose(fp);
+    return NULL;
+  }
 
   fclose(fp);
   return file_contents_buffer;
@@ -103,13 +119,12 @@ static unsigned char *compress_blob(const unsigned char *blob_buffer,
   return compressed_blob;
 }
 
-static void write_object(unsigned char *compressed_blob, size_t compressed_size,
-                         const char *hex_hash) {
+static int write_object(unsigned char *compressed_blob, size_t compressed_size,
+                        const char *hex_hash) {
 
   // Variables
-  char first_hex[OBJECT_PATH_LEN];
-  char rest_hex[OBJECT_PATH_LEN];
-  const int DIR_PERMS = 0777;
+  char first_hex[MAX_OBJECT_PATH_LEN_FIRST_HEX];
+  char rest_hex[MAX_OBJECT_PATH_LEN_REST_HEX];
 
   // Create directory using first 2 hex
   snprintf(first_hex, sizeof(first_hex), ".git/objects/%.2s", hex_hash);
@@ -117,6 +132,7 @@ static void write_object(unsigned char *compressed_blob, size_t compressed_size,
   if (mkdir(first_hex, DIR_PERMS) == -1) {
     if (errno != EEXIST) {
       perror("Failed to create folder for a different reason.");
+      return -1;
     }
   }
 
@@ -127,18 +143,30 @@ static void write_object(unsigned char *compressed_blob, size_t compressed_size,
   FILE *fp = fopen(rest_hex, "wb");
   if (fp == NULL) {
     fprintf(stderr, "Could not open %s\n", hex_hash);
+    return -1;
   }
 
-  fwrite(compressed_blob, 1, compressed_size, fp);
+  size_t written = fwrite(compressed_blob, 1, compressed_size, fp);
+  if (written != compressed_size) {
+    fprintf(stderr, "Short write to object file\n");
+    fclose(fp);
+    return -1;
+  }
 
-  fclose(fp);
+  if (fclose(fp) != 0) {
+    fprintf(stderr, "Failed to flush object file\n");
+    return -1;
+  }
+
+  return 0;
 }
 
 int tinygitAdd(const char *path) {
   // Variables
-  size_t file_size;
-  size_t blob_size;
-  size_t compressed_size;
+  size_t file_size = 0;
+  size_t blob_size = 0;
+  size_t compressed_size = 0;
+  size_t write_result = 0;
   char hex_hash[41];
   unsigned char hash[SHA_DIGEST_LENGTH];
   unsigned char *file = NULL;
@@ -161,8 +189,71 @@ int tinygitAdd(const char *path) {
   build_hash(hex_hash, hash);
 
   compressed_blob = compress_blob(blob, blob_size, &compressed_size);
+  if (compressed_blob == NULL) {
+    fprintf(stderr, "Compressed Blob is NULL.\n");
+    free(file);
+    free(blob);
+    return -1;
+  }
 
-  write_object(compressed_blob, compressed_size, hex_hash);
+  write_result = write_object(compressed_blob, compressed_size, hex_hash);
+  if (write_result != 0) {
+    fprintf(stderr, "File was not written.\n");
+    free(file);
+    free(blob);
+    free(compressed_blob);
+    return -1;
+  }
+
+  struct stat st;
+
+  if (stat(path, &st) != 0) {
+    perror("stat failed");
+    free(file);
+    free(blob);
+    free(compressed_blob);
+    return -1;
+  }
+
+  struct Entry e;
+
+  e.st = st;
+  memcpy(e.sha1, hash, SHA_DIGEST_LENGTH);
+  strncpy(e.path, path, sizeof(e.path) - 1);
+  e.path[sizeof(e.path) - 1] = '\0';
+
+  struct Index idx = {0};
+
+  // read
+  if (read_index(".git/index", &idx) != 0) {
+    fprintf(stderr, "Index is not reading...\n");
+    free(file);
+    free(blob);
+    free(compressed_blob);
+    return -1;
+  }
+  // add
+  if (add_entry(&e, &idx) != 0) {
+    fprintf(stderr, "Entry is not added to index...\n");
+    free_index(&idx);
+    free(file);
+    free(blob);
+    free(compressed_blob);
+    return -1;
+  }
+
+  // write
+  if (write_index(".git/index", &idx) != 0) {
+    fprintf(stderr, "Can not write index to %s\n", path);
+    free_index(&idx);
+    free(file);
+    free(blob);
+    free(compressed_blob);
+    return -1;
+  }
+
+  // free
+  free_index(&idx);
 
   // Cleanup
   free(file);
@@ -171,3 +262,5 @@ int tinygitAdd(const char *path) {
 
   return 0;
 }
+
+// TODO: collapse error cleanup to a single goto cleanup label
