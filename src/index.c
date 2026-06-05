@@ -17,6 +17,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int compare_paths(const void *a, const void *b){
+  const struct Entry *e1 = (const struct Entry *)a;
+  const struct Entry *e2 = (const struct Entry *)b;
+
+  return strcmp(e1->path, e2->path);
+}
+
 static uint16_t read_be16(FILE *fp) {
   uint16_t raw;
   fread(&raw, 1, 2, fp);
@@ -121,7 +128,7 @@ int read_index(const char *path, struct Index *out_index) {
     flags = read_be16(fp);
 
     name_len = flags & 0xFFF;
-    entry_len = 62 + name_len + 1;
+    entry_len = 62 + name_len;
     pad_len = 8 - (entry_len % 8);
 
     if (name_len > sizeof(e->path) - 1) {
@@ -141,7 +148,7 @@ int read_index(const char *path, struct Index *out_index) {
       return -1;
     }
 
-    fseek(fp, pad_len, SEEK_CUR);
+    fseek(fp, pad_len - 1, SEEK_CUR);
   }
 
   fclose(fp);
@@ -181,7 +188,7 @@ static void write_and_hash(const void *data, size_t len, FILE *fp,
   SHA1_Update(ctx, data, len);
 }
 
-int write_index(const char *path, const struct Index *index) {
+int write_index(const char *path, struct Index *index) {
   SHA_CTX ctx;
   unsigned char digest[20];
   uint32_t version = htonl(2);
@@ -200,12 +207,14 @@ int write_index(const char *path, const struct Index *index) {
   write_and_hash(&version, sizeof(version), fp, &ctx);
   write_and_hash(&count, sizeof(count), fp, &ctx);
 
+  qsort(index->entries, index->count, sizeof(struct Entry), compare_paths);
+
   // loop entries
   for (size_t i = 0; i < index->count; i++) {
     const struct Entry *e = &index->entries[i];
 
     size_t name_len = strlen(e->path);
-    size_t entry_len = 62 + name_len + 1; // 62 bytes + path + NUL term
+    size_t entry_len = 62 + name_len; // 62 bytes + path + NUL term
     size_t pad_len = 8 - (entry_len % 8);
 
     static const char zeros[8] = {0};
@@ -235,7 +244,7 @@ int write_index(const char *path, const struct Index *index) {
     write_and_hash(&file_size, sizeof(file_size), fp, &ctx);
     write_and_hash(e->sha1, 20, fp, &ctx);
     write_and_hash(&flags, sizeof(flags), fp, &ctx);
-    write_and_hash(e->path, name_len + 1, fp, &ctx);
+    write_and_hash(e->path, name_len, fp, &ctx);
     write_and_hash(zeros, pad_len, fp, &ctx);
   }
 

@@ -20,7 +20,7 @@ struct Index {
 
 int read_index(const char *path, struct Index *out_index);
 int add_entry(const struct Entry *in_entry, struct Index *out_index);
-int write_index(const char *path, const struct Index *index);
+int write_index(const char *path, struct Index *index);
 void free_index(struct Index *index);
 
 #endif
