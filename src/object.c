@@ -104,3 +104,29 @@ return -1;
 
 return 0;
 }
+
+int store_object(const char *type, const unsigned char *content, size_t content_size, char out_hex[41], unsigned char out_raw[20]) {
+    size_t object_size = 0;
+    size_t compressed_size = 0;
+    unsigned char *object = build_object(type, content, content_size, &object_size);
+    if (object == NULL) {
+        fprintf(stderr, "When storing object, the object is NULL.");
+        return -1;
+    }
+
+    hash_object(object, object_size, out_raw);
+    build_hash(out_hex, out_raw);
+
+    unsigned char *compressed_object = compress_object(object, object_size, &compressed_size);
+    if(compressed_object == NULL) {
+        fprintf(stderr, "When compressing the store object, the compressed object is NULL.");
+        free(object);
+        return -1;
+    }
+
+    int result = write_object(compressed_object, compressed_size, out_hex);
+    free(object);
+    free(compressed_object);
+
+    return result;
+}
