@@ -12,5 +12,7 @@ unsigned char *compress_object(const unsigned char *blob_buffer,
     size_t *out_compressed_size);
     int write_object(unsigned char *compressed_blob, size_t compressed_size,
         const char *hex_hash);
+int store_object(const char *type, const unsigned char *content,
+    size_t content_size, char out_hex[41], unsigned char out_raw[20]);
 
 #endif

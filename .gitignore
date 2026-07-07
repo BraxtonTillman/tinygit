@@ -7,5 +7,6 @@ tinygit
 # Object files (if you add separate compile steps later)
 *.o
 
+/build
 /tmp
 /gittest
