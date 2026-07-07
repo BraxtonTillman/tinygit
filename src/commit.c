@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 int write_tree(struct Index *index, char out_hex[41],
                unsigned char out_raw[20]) {
@@ -37,4 +38,35 @@ int write_tree(struct Index *index, char out_hex[41],
 
   free(tree_buf);
   return rc;
+}
+
+// PURE: builds the text, fills caller's buffer, returns length. No time(), no
+// store.
+int build_commit_buffer(const char *tree_hex, const char *parent_hex,
+                        const char *message, time_t ts, char *buf,
+                        size_t bufsize) {
+  int len = 0;
+  const char *name = "Braxton Tillman";
+  const char *email = "braxtontillman@gmail.com";
+
+  len += snprintf(buf + len, bufsize - len, "tree %s\n", tree_hex);
+  if (parent_hex)
+    len += snprintf(buf + len, bufsize - len, "parent %s\n", parent_hex);
+  len += snprintf(buf + len, bufsize - len, "author %s <%s> %ld +0000\n", name,
+                  email, (long)ts);
+  len += snprintf(buf + len, bufsize - len, "committer %s <%s> %ld +0000\n",
+                  name, email, (long)ts);
+  len += snprintf(buf + len, bufsize - len, "\n%s\n", message);
+  return len;
+}
+
+// THIN: gets the time, calls the pure builder, stores. Returns rc.
+int write_commit(const char *tree_hex, const char *parent_hex,
+                 const char *message, char out_hex[41],
+                 unsigned char out_raw[20]) {
+  char buf[4096];
+  int len = build_commit_buffer(tree_hex, parent_hex, message, time(NULL), buf,
+                                sizeof(buf));
+  return store_object("commit", (unsigned char *)buf, (size_t)len, out_hex,
+                      out_raw);
 }

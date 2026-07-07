@@ -1,11 +1,9 @@
+#include "../include/commit.h"
 #include "../include/index.h"
-#include "../include/object.h"
 #include <stdio.h>
 #include <string.h>
 
 static int tests_run = 0, tests_failed = 0;
-int write_tree(struct Index *index, char out_hex[41],
-               unsigned char out_raw[20]);
 
 #define CHECK(name, cond)                                                      \
   do {                                                                         \
@@ -83,9 +81,25 @@ static void test_write_tree_sha(void) {
         strcmp(out_hex, "1a3eb013a13fbe197effac28e9f6baffff317dc4") == 0);
 }
 
+static void test_commit_format(void) {
+  char buf[4096];
+  time_t fixed_ts = 1780929211;
+  int len = build_commit_buffer("1a3eb013a13fbe197effac28e9f6baffff317dc4",
+                                NULL, "first", fixed_ts, buf, sizeof(buf));
+
+  CHECK("commit len positive", len > 0);
+  CHECK("has tree line",
+        strstr(buf, "tree 1a3eb013a13fbe197effac28e9f6baffff317dc4\n") != NULL);
+  CHECK("has author line", strstr(buf, "author ") != NULL);
+  CHECK("has committer line", strstr(buf, "committer ") != NULL);
+  CHECK("blank line before message", strstr(buf, "+0000\n\nfirst\n") != NULL);
+  CHECK("no parent line for first commit", strstr(buf, "parent ") == NULL);
+}
+
 int main(void) {
   test_tree_row();
   test_write_tree_sha();
+  test_commit_format();
   printf("\n%d run, %d failed\n", tests_run, tests_failed);
   return tests_failed ? 1 : 0;
 }
