@@ -1,6 +1,6 @@
 // main.c
 
-#include "../include/add.h"
+/* #include "../include/add.h"
 #include "../include/index.h"
 #include "../include/init.h"
 #include <stdio.h>
@@ -20,6 +20,38 @@ int main(int argc, char *argv[]) {
     tinygitAdd(argv[2]);
   }
 
+  return 0;
+}
+*/
+
+// tree_test.c — throwaway, just to eyeball one row
+#include "../include/index.h"
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+  struct Index idx = {0};
+  if (read_index(".git/index", &idx) != 0) {
+    fprintf(stderr, "couldn't read index\n");
+    return 1;
+  }
+  if (idx.count == 0) {
+    fprintf(stderr, "index is empty — add a file first\n");
+    return 1;
+  }
+
+  struct Entry *e = &idx.entries[0]; // first entry, e.g. "x"
+
+  char row[300];
+  int n = sprintf(row, "100644 %s", e->path);
+  memcpy(row + n + 1, e->sha1, 20);
+  size_t row_len = n + 1 + 20;
+
+  for (size_t i = 0; i < row_len; i++)
+    printf("%02x ", (unsigned char)row[i]);
+  printf("\n");
+
+  free_index(&idx);
   return 0;
 }
 
