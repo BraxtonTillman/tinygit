@@ -1,5 +1,6 @@
 #include "../include/index.h"
 #include "../include/object.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,4 +70,110 @@ int write_commit(const char *tree_hex, const char *parent_hex,
                                 sizeof(buf));
   return store_object("commit", (unsigned char *)buf, (size_t)len, out_hex,
                       out_raw);
+}
+
+int read_head_ref(const char *head_path, char *out_ref, size_t size) {
+  FILE *fp = fopen(head_path, "rb");
+  if (fp == NULL) {
+    fprintf(stderr, "Could not open %s\n", head_path);
+    return -1;
+  }
+
+  char buf[256];
+
+  if (fgets(buf, sizeof(buf), fp) == NULL) {
+    fprintf(stderr, "HEAD is empty\n");
+    fclose(fp);
+    return -1;
+  }
+  fclose(fp);
+
+  buf[strcspn(buf, "\n")] = '\0';
+
+  if (strncmp(buf, "ref: ", 5) != 0) {
+    fprintf(stderr, "HEAD is not a symbolic ref (detached?)\n");
+    return -1;
+  }
+
+  snprintf(out_ref, size, "%s", buf + 5);
+  return 0;
+}
+
+int read_ref(const char *ref_path, char out_hex[41]) {
+  FILE *fp = fopen(ref_path, "rb");
+  if (fp == NULL) {
+    if (errno == ENOENT)
+      return 1;
+    return -1;
+  }
+  char buf[50];
+
+  if (fgets(buf, sizeof(buf), fp) == NULL) {
+    fprintf(stderr, "Empty or unreadable ref: %s\n", ref_path);
+    fclose(fp);
+    return -1;
+  }
+
+  buf[strcspn(buf, "\n")] = '\0';
+
+  if (strlen(buf) != 40) {
+    fprintf(stderr, "Corrupt ref (expected 40 hex chars): %s\n", ref_path);
+    fclose(fp);
+    return -1;
+  }
+
+  snprintf(out_hex, 41, "%s", buf);
+
+  fclose(fp);
+  return 0;
+}
+
+int update_ref(const char *ref_path, const char *hex) {
+  FILE *fp = fopen(ref_path, "w");
+  if (fp == NULL) {
+    return -1;
+  }
+  fprintf(fp, "%s\n", hex);
+  if (fclose(fp) != 0) {
+    return -1;
+  }
+  return 0;
+}
+
+int tinygitCommit(const char *message) {
+  struct Index idx = {0};
+  char tree_hex[41], commit_hex[41], parent_hex[41];
+  unsigned char tree_raw[20], commit_raw[20];
+  char ref_rel[256], ref_path[300];
+
+  if (read_index(".git/index", &idx) != 0)
+    return -1;
+  if (idx.count == 0) {
+    fprintf(stderr, "nothing to commit\n");
+    free_index(&idx);
+    return -1;
+  }
+
+  if (write_tree(&idx, tree_hex, tree_raw) != 0) {
+    free_index(&idx);
+    return -1;
+  }
+  free_index(&idx); // done with the index
+
+  if (read_head_ref(".git/HEAD", ref_rel, sizeof(ref_rel)) != 0)
+    return -1;
+  snprintf(ref_path, sizeof(ref_path), ".git/%s", ref_rel);
+
+  int rc = read_ref(ref_path, parent_hex);
+  if (rc == -1)
+    return -1;                                        // corrupt ref
+  const char *parent = (rc == 0) ? parent_hex : NULL; // rc==1 -> first commit
+
+  if (write_commit(tree_hex, parent, message, commit_hex, commit_raw) != 0)
+    return -1;
+  if (update_ref(ref_path, commit_hex) != 0)
+    return -1;
+
+  printf("%s %s\n", (parent ? "commit" : "root-commit"), commit_hex);
+  return 0;
 }

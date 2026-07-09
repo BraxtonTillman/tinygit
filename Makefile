@@ -7,7 +7,7 @@ OPENSSL := $(shell brew --prefix openssl)
 CFLAGS  = -Wall -Wextra -g -std=c11 -I include -I$(OPENSSL)/include
 LDFLAGS = -L$(OPENSSL)/lib -lcrypto -lz
 
-SRC = src/main.c src/init.c src/index.c src/add.c src/object.c
+SRC = src/main.c src/init.c src/index.c src/add.c src/object.c src/commit.c
 TARGET = tinygit
 
 # Sources the test harness needs (no main.c/add.c — the harness has its own main)

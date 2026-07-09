@@ -2,7 +2,7 @@
 #define OBJECT_H
 #include <stddef.h>
 
-unsigned char *build_object(const char *type, unsigned char *content,
+unsigned char *build_object(const char *type, const unsigned char *content,
                             size_t content_size, size_t *out_object_size);
 void hash_object(const unsigned char *blob_buffer, size_t blob_size,
                  unsigned char *out_hash);
