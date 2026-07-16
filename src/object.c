@@ -198,5 +198,10 @@ int read_object(const char *hex, unsigned char *out_content, size_t bufsize,
 
   memmove(out_content, nul + 1, *out_len);
 
+  if (*out_len < bufsize)
+    out_content[*out_len] = '\0';
+
   return 0;
 }
+
+int tinygitLog() { return 0; }

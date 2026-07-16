@@ -9,7 +9,7 @@
 
 int write_tree(struct Index *index, char out_hex[41],
                unsigned char out_raw[20]) {
-  // PASS 1: compute exact total size
+
   size_t total = 0;
   for (size_t i = 0; i < index->count; i++) {
     size_t name_len = strlen(index->entries[i].path);
@@ -22,7 +22,6 @@ int write_tree(struct Index *index, char out_hex[41],
     return -1;
   }
 
-  // PASS 2: build each row, append into tree_buf
   char scratch[300];
   size_t offset = 0;
   for (size_t i = 0; i < index->count; i++) {
@@ -35,15 +34,12 @@ int write_tree(struct Index *index, char out_hex[41],
     offset += row_len;
   }
 
-  // store: pass the CALLER's out_hex/out_raw straight through
   int rc = store_object("tree", tree_buf, offset, out_hex, out_raw);
 
   free(tree_buf);
   return rc;
 }
 
-// PURE: builds the text, fills caller's buffer, returns length. No time(), no
-// store.
 int build_commit_buffer(const char *tree_hex, const char *parent_hex,
                         const char *message, time_t ts, char *buf,
                         size_t bufsize) {
@@ -62,7 +58,6 @@ int build_commit_buffer(const char *tree_hex, const char *parent_hex,
   return len;
 }
 
-// THIN: gets the time, calls the pure builder, stores. Returns rc.
 int write_commit(const char *tree_hex, const char *parent_hex,
                  const char *message, char out_hex[41],
                  unsigned char out_raw[20]) {
@@ -167,8 +162,8 @@ int tinygitCommit(const char *message) {
 
   int rc = read_ref(ref_path, parent_hex);
   if (rc == -1)
-    return -1;                                        // corrupt ref
-  const char *parent = (rc == 0) ? parent_hex : NULL; // rc==1 -> first commit
+    return -1;
+  const char *parent = (rc == 0) ? parent_hex : NULL;
 
   if (write_commit(tree_hex, parent, message, commit_hex, commit_raw) != 0)
     return -1;
@@ -176,5 +171,49 @@ int tinygitCommit(const char *message) {
     return -1;
 
   printf("%s %s\n", (parent ? "commit" : "root-commit"), commit_hex);
+  return 0;
+}
+
+int parse_commit(const unsigned char *buf, const size_t len, char out_tree[41],
+                 char out_parent[41], char *out_msg, size_t msg_size) {
+
+  size_t pos = 0;
+
+  // tree line
+  if (len < pos + 46) { /* too short */
+    return -1;
+  }
+  if (strncmp((const char *)buf + pos, "tree ", 5) != 0) { /* error */
+    return -1;
+  }
+  snprintf(out_tree, 41, "%.40s", buf + pos + 5);
+  pos += 46;
+
+  // parent line
+  if (len >= pos + 7 && strncmp((const char *)buf + pos, "parent ", 7) == 0) {
+    if (len < pos + 48) { /* too short */
+      return -1;
+    }
+    snprintf(out_parent, 41, "%.40s", buf + pos + 7);
+    pos += 48;
+  } else {
+    out_parent[0] = '\0';
+  }
+
+  // commit line
+  const char *sep = strstr((const char *)buf + pos, "\n\n");
+  if (sep == NULL) {
+    fprintf(stderr, "Malformed commit: no header/message separator\n");
+    return -1;
+  }
+
+  size_t msg_start = (size_t)(sep - (const char *)buf) + 2;
+  size_t msg_len = len - msg_start;
+
+  if (msg_len > 0 && buf[len - 1] == '\n')
+    msg_len--;
+
+  snprintf(out_msg, msg_size, "%.*s", (int)msg_len, buf + msg_start);
+
   return 0;
 }

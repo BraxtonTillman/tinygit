@@ -14,5 +14,7 @@ int write_object(unsigned char *compressed_blob, size_t compressed_size,
 int store_object(const char *type, const unsigned char *content,
                  size_t content_size, char out_hex[41],
                  unsigned char out_raw[20]);
+int read_object(const char *hex, unsigned char *out_content, size_t bufsize,
+                size_t *out_len);
 
 #endif
