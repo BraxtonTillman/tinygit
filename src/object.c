@@ -187,9 +187,16 @@ int read_object(const char *hex, unsigned char *out_content, size_t bufsize,
     return -1;
   }
 
-  // TODO: SKIP THE HEADER
+  unsigned char *nul = memchr(out_content, '\0', dest_len);
+  if (nul == NULL) {
+    fprintf(stderr, "Malformed object: no header terminator\n");
+    return -1;
+  }
 
-  // TODO: THEN COPY FROM THERE INTO OUT_CONTENT & OUT_LEN
+  size_t header_len = (nul - out_content) + 1;
+  *out_len = dest_len - header_len;
+
+  memmove(out_content, nul + 1, *out_len);
 
   return 0;
 }
