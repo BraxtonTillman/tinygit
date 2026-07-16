@@ -1,9 +1,14 @@
 CC = clang
 
-OPENSSL := $(shell brew --prefix openssl)
+OPENSSL := $(shell brew --prefix openssl 2>/dev/null)
 
-CFLAGS  = -Wall -Wextra -g -std=c11 -I include -I$(OPENSSL)/include
-LDFLAGS = -L$(OPENSSL)/lib -lcrypto -lz
+CFLAGS  = -Wall -Wextra -g -std=c11 -I include
+LDFLAGS = -lcrypto -lz
+
+ifneq ($(OPENSSL),)
+  CFLAGS  += -I$(OPENSSL)/include
+  LDFLAGS += -L$(OPENSSL)/lib
+endif
 
 SRC  = src/main.c src/init.c src/index.c src/add.c src/object.c src/commit.c
 HDRS = include/object.h include/add.h include/index.h include/commit.h include/init.h

@@ -203,5 +203,3 @@ int read_object(const char *hex, unsigned char *out_content, size_t bufsize,
 
   return 0;
 }
-
-int tinygitLog() { return 0; }

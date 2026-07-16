@@ -28,5 +28,10 @@ int main(int argc, char *argv[]) {
     return tinygitCommit(argv[3]);
   }
 
-  return 0;
+  if (strcmp(argv[1], "log") == 0) {
+    return tinygitLog();
+  }
+
+  fprintf(stderr, "unknown command: %s\n", argv[1]);
+  return 1;
 }

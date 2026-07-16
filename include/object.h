@@ -16,5 +16,4 @@ int store_object(const char *type, const unsigned char *content,
                  unsigned char out_raw[20]);
 int read_object(const char *hex, unsigned char *out_content, size_t bufsize,
                 size_t *out_len);
-
 #endif

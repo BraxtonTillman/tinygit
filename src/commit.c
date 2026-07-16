@@ -100,6 +100,7 @@ int read_ref(const char *ref_path, char out_hex[41]) {
   if (fp == NULL) {
     if (errno == ENOENT)
       return 1;
+    perror(ref_path);
     return -1;
   }
   char buf[50];
@@ -131,6 +132,7 @@ int update_ref(const char *ref_path, const char *hex) {
   }
   fprintf(fp, "%s\n", hex);
   if (fclose(fp) != 0) {
+    perror(ref_path);
     return -1;
   }
   return 0;
@@ -215,5 +217,42 @@ int parse_commit(const unsigned char *buf, const size_t len, char out_tree[41],
 
   snprintf(out_msg, msg_size, "%.*s", (int)msg_len, buf + msg_start);
 
+  return 0;
+}
+
+int tinygitLog(void) {
+  char ref_rel[256], ref_path[300];
+  char current_hex[41];
+
+  // --- SETUP: once ---
+  if (read_head_ref(".git/HEAD", ref_rel, sizeof(ref_rel)) != 0)
+    return -1;
+  snprintf(ref_path, sizeof(ref_path), ".git/%s", ref_rel);
+
+  int rc = read_ref(ref_path, current_hex);
+  if (rc == 1) {
+    fprintf(stderr, "no commits yet\n");
+    return -1;
+  }
+  if (rc == -1)
+    return -1;
+
+  unsigned char buf[8192];
+  size_t len;
+  char tree_hex[41], parent_hex[41], msg[256];
+
+  // --- WALK: repeats ---
+  while (1) {
+    if (read_object(current_hex, buf, sizeof(buf), &len) != 0)
+      return -1;
+    if (parse_commit(buf, len, tree_hex, parent_hex, msg, sizeof(msg)) != 0)
+      return -1;
+
+    printf("%s %s\n", current_hex, msg);
+
+    if (parent_hex[0] == '\0')
+      break;
+    snprintf(current_hex, sizeof(current_hex), "%s", parent_hex);
+  }
   return 0;
 }

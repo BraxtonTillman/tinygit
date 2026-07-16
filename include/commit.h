@@ -20,4 +20,5 @@ int update_ref(const char *ref_path, const char *hex);
 int parse_commit(const unsigned char *buf, const size_t len, char out_tree[41],
                  char out_parent[41], char *out_msg, size_t msg_size);
 int tinygitCommit(const char *message);
+int tinygitLog(void);
 #endif
