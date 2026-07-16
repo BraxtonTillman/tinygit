@@ -1,12 +1,5 @@
-# Built binary
 tinygit
-
-# macOS debug symbols (from clang -g)
 *.dSYM/
-
-# Object files (if you add separate compile steps later)
 *.o
-
 /build
-/tmp
-/gittest
+
