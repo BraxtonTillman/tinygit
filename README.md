@@ -71,15 +71,13 @@ The three object types connect like this — a commit points at a tree (the snap
 
 <img width="1365" height="1140" alt="tinygit_object_flow" src="https://github.com/user-attachments/assets/53f84ec9-95d8-4df3-80ad-fde4cf0fcd7c" />
 
-
 ### Content-addressable storage
 
 Objects are hashed using SHA-1 and stored in the .git/objects directory. The hash is the address, meaning identical content always hashes to the same path. So it is stored exactly once.
 The name is derived from the content, so any corruption changes the hash and is immediately detectable.
 The storage path is sharded in a 2/38 split inside the object directory, meaning that the hash's first two hex characters are the subdirectory and the rest is the filename.
 
-<img width="1755" height="1425" alt="tinygit_content_storage_flow" src="https://github.com/user-attachments/assets/0f6a52e3-695c-4f0f-99fb-e9b5da5f8b6a" />
-
+<img width="1676" height="1326" alt="tinygit_content_storage_flow" src="https://github.com/user-attachments/assets/bff245f8-8d1b-48a0-8fb4-b23dc550b99f" />
 
 ### Refs and the commit graph
 
