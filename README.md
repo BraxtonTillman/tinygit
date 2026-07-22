@@ -101,14 +101,7 @@ For each staged file (after running tinygit add), there is an entry containing: 
 
 In the entry format stated above, each entry  is padded with 1 - 8 NUL bytes so its total length is a multiple of 8, and the path's NUL terminator counts as the first padding byte. Multi-byte fields are stored big-endian regardless of host architecture (via ```htonl/ntohl```). This is what makes TinyGit's index byte-identical to real Git's index.
 
-```
- working dir              index (staging)           object store
-┌──────────────┐        ┌──────────────┐         ┌──────────────┐
-│ files you've │  add   │ snapshot of  │ commit  │ permanent,   │
-│ edited       │ ─────► │ what goes in │ ──────► │ hashed       │
-│ (uncommitted)│        │ next commit  │         │ objects      │
-└──────────────┘        └──────────────┘         └──────────────┘
-```
+<img width="1691" height="281" alt="tinygit_workflow" src="https://github.com/user-attachments/assets/0b371117-7b51-4d29-a73a-9e8741a6e4c8" />
 
 ## Build
 
