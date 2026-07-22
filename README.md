@@ -86,17 +86,8 @@ Refs are files that contain a hash. In TinyGit, ```.git/refs/heads/master``` is 
 ```.git/HEAD``` doesn't contain a commit hash, it contains ```ref: refs/heads/master```. So to find the current commit, we need to hop twice: HEAD names a ref, the ref names a commit. This is exactly why we can advance the branch without directly touching HEAD. All we have to do is overwrite the ref file with the new commit's hash, and HEAD continues to point at the same branch.
 
 Note: when there are no commits (like when you initialize tinygit), ```refs/heads/master``` does not exist. Also, before writing a new commit, TinyGit reads the current ref to get the parent hash (the previous commit's hash). If the file exists, that hash becomes the parent line, the commit is a root commit, and ```ref/heads/master``` is created.
-```
-.git/HEAD
-   │  contains "ref: refs/heads/master"
-   ▼
-.git/refs/heads/master
-   │  contains a 40-hex commit hash
-   ▼
-commit (tip)  ──parent──►  commit  ──parent──►  ∅
-   ▲                                            (root: no parent, walk ends)
-   └── where `log` starts, following parent edges backward
-```
+
+<img width="1814" height="746" alt="tinygit_ref_commit_flow" src="https://github.com/user-attachments/assets/33b49662-7cfd-43fc-bba6-9afa373d8f37" />
 
 ### The index/staging area
 
