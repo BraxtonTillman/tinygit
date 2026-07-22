@@ -157,20 +157,30 @@ output with stock Git plumbing:
 
 If real Git can read it, the format is correct.
 
-## Project structure TODO
-
-[A tree of the repo so a reviewer can navigate it. Keep it to the meaningful files.]
+## Project structure
 
 ```
 tinygit/
 ├── src/
-│   ├── [object.cpp]      # [object serialization + hashing]
-│   ├── [index.cpp]       # [staging area]
-│   └── [...]
+│ ├── main.c # argument dispatch
+│ ├── init.c # repository initialization
+│ ├── index.c # staging area: binary read/write, sorting
+│ ├── add.c # stage a file: read, hash to blob, update index
+│ ├── object.c # shared: header + SHA-1 + zlib + object store I/O
+│ └── commit.c # tree building, commit assembly, refs, log
 ├── include/
+│ ├── init.h
+│ ├── add.h
+│ ├── index.h
+│ ├── object.h
+│ └── commit.h
 ├── tests/
+│ └── run_tests.c # hand-rolled test harness
+├── Makefile
+├── compile_flags.txt # clangd config for editor tooling
 └── README.md
 ```
+`object.c` is the shared file that turns everything into its appropriate object type. Every command routes through it.
 
 ## Design decisions
 
@@ -213,5 +223,3 @@ Here are some possible next steps:
 ## AI Usage
 
 This project was written entirely by me, and me alone. AI was used in the learning process, research, and code review. All code and design were written and designed by me.
-
-## TODO: Update all designs with lucid charts before committing
