@@ -78,20 +78,8 @@ Objects are hashed using SHA-1 and stored in the .git/objects directory. The has
 The name is derived from the content, so any corruption changes the hash and is immediately detectable.
 The storage path is sharded in a 2/38 split inside the object directory, meaning that the hash's first two hex characters are the subdirectory and the rest is the filename.
 
-```
-file content
-     │
-     │  hash = SHA-1(header + content)      ← computed on UNCOMPRESSED bytes
-     ▼
-┌────────────────────────────────────────────┐
-│  3b18e512dba79e4c8300dd08aeb37fb07b ...      │   ◄── the object's hash
-└────────────────────────────────────────────┘
-     │                              │
-     │ used as its id               │ used as its storage path
-     ▼                              ▼
-referenced by                  .git/objects/3b/18e512...
-trees and commits              (first 2 chars = subdir, rest = filename)
-```
+<img width="1755" height="1425" alt="tinygit_content_storage_flow" src="https://github.com/user-attachments/assets/0f6a52e3-695c-4f0f-99fb-e9b5da5f8b6a" />
+
 
 ### Refs and the commit graph
 
