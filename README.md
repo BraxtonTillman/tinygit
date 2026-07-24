@@ -131,31 +131,60 @@ make test
 
 ## Demo TODO
 
-[A short, copy-pasteable walkthrough showing a real session end to end.]
+```console
+$ tinygit init
+Initialized empty Git repository.
+$ echo "hello" > hello.txt
+$ tinygit add hello.txt
+$ tinygit commit -m "first commit"
+root-commit 0833790aec7e49f47de2473335a35c5ae87984db
 
-```bash
-tinygit init
-tinygit add hello.txt
-tinygit commit -m "first commit"
-tinygit log
+$ git log --oneline
+0833790 (HEAD -> master) first commit
+```
+That last command is stock Git, reading a commit TinyGit wrote.
+
+## Verification
+
+Because TinyGit writes canonical Git objects, stock Git can read everything it produces. Each of the three object types, inspected with Git's own plumbing:
+
+```console
+$ git cat-file -t 0833790
+commit
+
+$ git cat-file -p 0833790
+tree aaa96ced2d9a1c8e72c56b253a0e2fe78393feb7
+author Braxton Tillman <braxtontillman@gmail.com> 1784906195 +0000
+committer Braxton Tillman <braxtontillman@gmail.com> 1784906195 +0000
+
+first commit
+
+$ git cat-file -p HEAD^{tree}
+100644 blob ce013625030ba8dba906f756967f9e9ca394464a    hello.txt
+
+$ git cat-file -p ce013625030ba8dba906f756967f9e9ca394464a
+hello
 ```
 
-## Verification TODO
+Commit → tree → blob, the full chain, read entirely by real Git.
 
-Because TinyGit writes canonical Git objects, you can verify its
-output with stock Git plumbing:
+Git's own integrity checker also passes on a TinyGit-built repository:
 
-    tinygit init
-    tinygit add hello.txt
-    tinygit commit -m "first commit"
+```console
+$ git fsck
+Checking ref database: 100% (1/1), done.
+Checking object directories: 100% (256/256), done.
+```
 
-    # inspect TinyGit's objects with REAL git:
-    git cat-file -t <hash>     # → blob / tree / commit
-    git cat-file -p <hash>     # pretty-prints the object
-    git ls-tree <tree-hash>    # lists tree entries
-    git log                    # walks the history TinyGit wrote
+`git fsck` walks every object, recomputes each hash against its contents, and verifies that all references resolve. A clean run is Git certifying the object store is well-formed.
 
-If real Git can read it, the format is correct.
+### How this was developed
+
+Every layer was built against real Git as an oracle rather than against a spec alone:
+
+- **The index** was verified by `xxd`-ing TinyGit's `.git/index` against real Git's, byte by byte. The only permitted differences are `ctime`, `mtime`, `ino`, and `dev` — which necessarily vary between two physically distinct files — and the trailing SHA-1 checksum that depends on them. Everything else is byte-identical.
+- **Trees** are verified by comparing TinyGit's tree hash to the hash real Git produces for the same files. Because the hash covers every byte of the tree, a matching hash proves the modes, names, NUL separators, raw hashes, and sort order are all exactly right in a single comparison.
+- **Commits** are verified by having real `git log` walk a history TinyGit wrote end to end, and by `git fsck`.
 
 ## Project structure
 
