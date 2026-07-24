@@ -43,7 +43,7 @@ int tinygitInit(void) {
   }
 
   // File Creation
-  if (createInitFile("HEAD", "ref: refs/heads/master") == -1) {
+  if (createInitFile("HEAD", "ref: refs/heads/master\n") == -1) {
     return -1;
   }
 

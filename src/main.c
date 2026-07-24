@@ -13,11 +13,15 @@ int main(int argc, char *argv[]) {
   }
 
   if (strcmp(argv[1], "init") == 0) {
-    tinygitInit();
+    return tinygitInit();
   }
 
   if (strcmp(argv[1], "add") == 0) {
-    tinygitAdd(argv[2]);
+    if (argc < 3) {
+      fprintf(stderr, "usage: tinygit add <file>\n");
+      return 1;
+    }
+    return tinygitAdd(argv[2]);
   }
 
   if (strcmp(argv[1], "commit") == 0) {
