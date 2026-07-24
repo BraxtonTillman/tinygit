@@ -6,15 +6,30 @@
 
 TinyGit is a smaller version of Git that recreates the most basic git commands developers use to learn why Git is built the way it is. This is for anyone who wants to see what Git actually does behind the scenes when you first start your repo, and up to when you actually commit your changes. What makes TinyGit special is that YOU (yes, you) can verify TinyGit's implementation with real Git.
 
+## Demo
+
+```console
+$ tinygit init
+Initialized empty Git repository.
+$ echo "hello" > hello.txt
+$ tinygit add hello.txt
+$ tinygit commit -m "first commit"
+root-commit 0833790aec7e49f47de2473335a35c5ae87984db
+
+$ git log --oneline
+0833790 (HEAD -> master) first commit
+```
+That last command is stock Git, reading a commit TinyGit wrote.
+
 ## Motivation
 
 There are a few reasons why I wanted to build TinyGit, so let's dive in!
 
-1. Git is beautiful, and what makes it beautiful is its simplicity. I wanted to learn this simplicity, as I believe it's important to learn the WHY in its systems. (Did you know that 94% of developers use Git?)
+1. Git is beautiful, and what makes it beautiful is its simplicity. I wanted to learn this simplicity, as I believe it's important to learn the WHY in its systems.
 2. I wanted to get really good at C. This might sound basic, but let me explain. My interests lie in aerospace and embedded engineering. Therefore, for me to get where I need to be, I need to be skilled in C.
 3. As mentioned earlier, I use Git all the time. I wanted to get better with Git, so I decided to get deep in the plumbing to also learn Git at a deep level.
 
-Overall, I wanted to get better at implementing systems, writing C code, and using Git.
+Overall, I want to improve my implementation of systems, C code, and Git.
 
 ## Features
 
@@ -30,15 +45,15 @@ Below are the commands you can use in TinyGit:
 TinyGit models a repo in two layers:
 
 - an immutable object store
-- mutable pointers to that object
+- mutable pointers into that store
 
-The immutable object store is CONTENT-ADDRESSABLE, meaning that the content, once hashed, is the key. This means we NEVER modify an object in place. We can only append. This gives us a "history," so to speak.
+The immutable object store is CONTENT-ADDRESSABLE, meaning that the content, once hashed, is the key. This means we NEVER modify an object in place. We can only create a new object. This gives us a "history," so to speak.
 The mutable pointers answer "where am I?" and "what's about to happen?":
 
-- HEAD: points to the current commit. It's how the tool knows where the next commit's parent should be.
+- HEAD: contains ref: refs/heads/master. It's how the tool knows where the next commit's parent should be.
 - The index: the staging area, path -> blob hash representing the snapshot that `commit` will turn into a tree.
 
-Note: There are refs (pointers) in Git, but this is defaulted to HEAD and a default branch as a minimalist approach.
+Note: There are refs (pointers) in Git, but HEAD and the default branch are set to HEAD by default as a minimalist approach.
 
 ### Object model
 
@@ -64,10 +79,10 @@ committer <name> <email> <unix-timestamp> <tz>
 <commit message>
 ```
 
-As you've probably noticed, the commit object contains a tree hash and a parent (tree) hash that is 40-character hexadecimal and not the 20-byte raw hash in #2. Why?
+As you've probably noticed, the commit object contains a tree hash and a parent (commit) hash that is 40-character hexadecimal and not the 20-byte raw hash in #2. Why?
 Well, the commit object's content is text, and it needs to be readable. Raw bytes would jam non-printable junk into the message, and since hexadecimal is printable ASCII, it can sit inline with the rest of the text.
 
-The three object types connect like this — a commit points at a tree (the snapshot) and at its parent commit (the history), and a tree points at blobs and subtrees:
+The three object types connect like this — a commit points at a tree (the snapshot) and at its parent commit (the history), and a tree points at blobs and subtrees (tinygit does not point at subtrees for simplicity):
 
 <img width="1365" height="1140" alt="tinygit_object_flow" src="https://github.com/user-attachments/assets/53f84ec9-95d8-4df3-80ad-fde4cf0fcd7c" />
 
@@ -85,7 +100,7 @@ Refs are files that contain a hash. In TinyGit, ```.git/refs/heads/master``` is 
 
 ```.git/HEAD``` doesn't contain a commit hash, it contains ```ref: refs/heads/master```. So to find the current commit, we need to hop twice: HEAD names a ref, the ref names a commit. This is exactly why we can advance the branch without directly touching HEAD. All we have to do is overwrite the ref file with the new commit's hash, and HEAD continues to point at the same branch.
 
-Note: when there are no commits (like when you initialize tinygit), ```refs/heads/master``` does not exist. Also, before writing a new commit, TinyGit reads the current ref to get the parent hash (the previous commit's hash). If the file exists, that hash becomes the parent line, the commit is a root commit, and ```ref/heads/master``` is created.
+Note: when there are no commits (like when you initialize tinygit), ```refs/heads/master``` does not exist. Also, before writing a new commit, TinyGit reads the current ref to get the parent hash (the previous commit's hash). If the ref exists → its hash becomes the parent line. If it doesn't exist → no parent line; the commit is a root commit, and the ref file gets created.
 
 <img width="1814" height="746" alt="tinygit_ref_commit_flow" src="https://github.com/user-attachments/assets/33b49662-7cfd-43fc-bba6-9afa373d8f37" />
 
@@ -95,9 +110,9 @@ The index is a single binary file ```.git/index```that holds the staging area. T
 
 ```tinygit add``` writes the blob to the object store immediately and records the file in the index. Example: ```tinygit add hello.txt```; the second this command runs, the blob is already on disk in ```.git/objects``` before any commit exists.
 
-For each staged file (after running tinygit add), there is an entry containing: the file's ```stat``` metadata (think timestamps, inode, uid/gid, size, device, mode), the file's blob hash, and its path. THE ENTRIES ARE SORTED BY THEIR PATH INSIDE THE INDEX. The staged file has a 12-byte header (DIRC signature, format version, entry count) and ends with a SHA-1 checksum over everything preceding it, so corruption is detectable.
+For each staged file (after running tinygit add), there is an entry containing: the file's ```stat``` metadata (think timestamps, inode, uid/gid, size, device, mode), the file's blob hash, and its path. THE ENTRIES ARE SORTED BY THEIR PATH INSIDE THE INDEX. The index file has a 12-byte header (DIRC signature, format version, entry count) and ends with a SHA-1 checksum over everything preceding it, so corruption is detectable.
 
-## A Quirk and how I made TinyGit's index byte-identical to Git's
+### A Quirk and how I made TinyGit's index byte-identical to Git's
 
 In the entry format stated above, each entry  is padded with 1 - 8 NUL bytes so its total length is a multiple of 8, and the path's NUL terminator counts as the first padding byte. Multi-byte fields are stored big-endian regardless of host architecture (via ```htonl/ntohl```). This is what makes TinyGit's index byte-identical to real Git's index.
 
@@ -128,21 +143,6 @@ Run the test suite with:
 ```bash
 make test
 ```
-
-## Demo TODO
-
-```console
-$ tinygit init
-Initialized empty Git repository.
-$ echo "hello" > hello.txt
-$ tinygit add hello.txt
-$ tinygit commit -m "first commit"
-root-commit 0833790aec7e49f47de2473335a35c5ae87984db
-
-$ git log --oneline
-0833790 (HEAD -> master) first commit
-```
-That last command is stock Git, reading a commit TinyGit wrote.
 
 ## Verification
 
@@ -215,21 +215,21 @@ tinygit/
 
 From the start, I had made design decisions around learning Git intimately and getting better at C. If I viewed something not aligning with these goals, then I deliberately cut it from the project. I refused to scope creep beyond the object model because it takes away from the intricacies of Git and its original purpose as a learning project.
 
-- **[Hashing choice]** — I chose SHA-1 because this is what makes TinyGit byte-compatible with real Git. If I went with SHA-256, then the hash output would be different and defeats one of the main purposes of the project. Note: Git is migrating to SHA-256 in the future, but as of right now it's SHA-1.
-- **[Storage format]** — Git stores objects two ways: "loose" (one zlib-compressed file per object, the 2/38 sharded layout mentioned earlier) and "packed"(many objects delta-compressed into a single packfile). I chose just to do loose because they're dead simple. All I had to do was write it and verify it. It's one object, one file, hash it, and done. Where packfiles add delta encoding  and an index format that would've been a project on their own.
-- **[Scope cuts]** — I deliberately left out branching, subdirectories, packfiles, and merge. The reason for this was due to the learning curve flattening with these topics as we start to go into areas that are more engineering work than it is learning. The scope was the object model, the conceptual core of Git, not recursive trees and bookkeeping that would end up as busy work.
+- **Hashing choice** — I chose SHA-1 because this is what makes TinyGit byte-compatible with real Git. If I went with SHA-256, then the hash output would be different and defeats one of the main purposes of the project. Note: Git is migrating to SHA-256 in the future, but as of right now it's SHA-1.
+- **Storage format** — Git stores objects two ways: "loose" (one zlib-compressed file per object, the 2/38 sharded layout mentioned earlier) and "packed"(many objects delta-compressed into a single packfile). I chose just to do loose because they're dead simple. All I had to do was write it and verify it. It's one object, one file, hash it, and done. Where packfiles add delta encoding  and an index format that would've been a project on their own.
+- **Scope cuts** — I deliberately left out branching, subdirectories, packfiles, and merge. The reason for this was due to the learning curve flattening with these topics as we start to go into areas that are more engineering work than it is learning. The scope was the object model, the conceptual core of Git, not recursive trees and bookkeeping that would end up as busy work.
   
 ## What I learned
 
 Two things stuck with me most: byte-level discipline, and the gap between understanding and fluency.
 
-The byte-level discipline came from the index formatting. Their index formatting contained packed binary with zero guardrails, where a single wrong byte silently corrupts everything. My NUL padding was off by one in a way that only surfaced for certain filename lengths, and finding bugs like that forced me to develop a real diagnostic loop: dump the bytes, diff them against real Git, and hunt down the mismatch. That loop turned out to be the actual skill, more than getting it right the first time.
+The byte-level discipline came from the index formatting. Git's index format is packed binary with zero guardrails, where a single wrong byte silently corrupts everything. My NUL padding was off by one in a way that only surfaced for certain filename lengths, and finding bugs like that forced me to develop a real diagnostic loop: dump the bytes, diff them against real Git, and hunt down the mismatch. That loop turned out to be the actual skill, more than getting it right the first time.
 
 The second lesson was subtler. I could reason through every line of this project and explain why it worked, but there were times when I would just stare at a blank file and not know where to begin. I've been working on decomposing the problem more into smaller chunks and taking it one bite at a time.
 
 ## Limitations & roadmap
 
-NOTE: These limitations were intended to keep the project going. Most of these are QOL updates or small implementations to make TinyGit even closer to real Git, but I felt as if it was redundant and took away from the core learning.
+NOTE: These limitations were intended to keep the project scoped. Most of these are QOL updates or small implementations to make TinyGit even closer to real Git, but I felt as if it was redundant and took away from the core learning.
 
 Here are TinyGit's limitations:
 
