@@ -50,10 +50,10 @@ TinyGit models a repo in two layers:
 The immutable object store is CONTENT-ADDRESSABLE, meaning that the content, once hashed, is the key. This means we NEVER modify an object in place. We can only create a new object. This gives us a "history," so to speak.
 The mutable pointers answer "where am I?" and "what's about to happen?":
 
-- HEAD: contains ref: refs/heads/master. It's how the tool knows where the next commit's parent should be.
+- HEAD: contains `ref: refs/heads/master`. It's how the tool knows where the next commit's parent should be.
 - The index: the staging area, path -> blob hash representing the snapshot that `commit` will turn into a tree.
 
-Note: There are refs (pointers) in Git, but HEAD and the default branch are set to HEAD by default as a minimalist approach.
+Note: Git supports arbitrary branches and refs. TinyGit reads whatever branch HEAD names, but provides no way to create or switch branches.
 
 ### Object model
 
@@ -67,7 +67,7 @@ where size is the byte length of the content, then a NUL terminator, then the co
 Below are the 3 types of objects:
 
 1. Blob - A blob object stores raw file contents and nothing else. No filename, no permissions, no timestamps, just raw content. ```blob <size>\0<raw file bytes>```
-2. Tree - A tree represents a directory snapshot. The content is a sequence of entries. Entries are sorted by name. Modes are `100644` for a normal file, `100755` for an executable, and `40000`for a subtree (nested directory). ```<mode> <name>\0<20-byte raw hash>``` (For TinyGit, we only use mode 100644 for simplicity)
+2. Tree - A tree represents a directory snapshot. The content is a sequence of entries. Entries are sorted by name. Modes are `100644` for a normal file, `100755` for an executable, and `40000` for a subtree (nested directory). ```<mode> <name>\0<20-byte raw hash>``` (For TinyGit, we only use mode 100644 for simplicity)
 3. Commit - A commit ties the snapshot to history. The content is the text:
 
 ```
@@ -106,7 +106,7 @@ Note: when there are no commits (like when you initialize tinygit), ```refs/head
 
 ### The index/staging area
 
-The index is a single binary file ```.git/index```that holds the staging area. The staging area holds the exact set of files that will go into the next commit. It sits directly between the working directory (files you're editing) and the object store (permanent committed objects).
+The index is a single binary file ```.git/index``` that holds the staging area. The staging area holds the exact set of files that will go into the next commit. It sits directly between the working directory (files you're editing) and the object store (permanent committed objects).
 
 ```tinygit add``` writes the blob to the object store immediately and records the file in the index. Example: ```tinygit add hello.txt```; the second this command runs, the blob is already on disk in ```.git/objects``` before any commit exists.
 
@@ -114,7 +114,7 @@ For each staged file (after running tinygit add), there is an entry containing: 
 
 ### A Quirk and how I made TinyGit's index byte-identical to Git's
 
-In the entry format stated above, each entry  is padded with 1 - 8 NUL bytes so its total length is a multiple of 8, and the path's NUL terminator counts as the first padding byte. Multi-byte fields are stored big-endian regardless of host architecture (via ```htonl/ntohl```). This is what makes TinyGit's index byte-identical to real Git's index.
+In the entry format stated above, each entry is padded with 1 - 8 NUL bytes so its total length is a multiple of 8, and the path's NUL terminator counts as the first padding byte. Multi-byte fields are stored big-endian regardless of host architecture (via ```htonl/ntohl```). This is what makes TinyGit's index byte-identical to real Git's index.
 
 <img width="1691" height="281" alt="tinygit_workflow" src="https://github.com/user-attachments/assets/0b371117-7b51-4d29-a73a-9e8741a6e4c8" />
 
@@ -213,10 +213,10 @@ tinygit/
 
 ## Design decisions
 
-From the start, I had made design decisions around learning Git intimately and getting better at C. If I viewed something not aligning with these goals, then I deliberately cut it from the project. I refused to scope creep beyond the object model because it takes away from the intricacies of Git and its original purpose as a learning project.
+From the start, I made design decisions around learning Git intimately and getting better at C. If I viewed something not aligning with these goals, then I deliberately cut it from the project. I refused to scope creep beyond the object model because it takes away from the intricacies of Git and its original purpose as a learning project.
 
 - **Hashing choice** — I chose SHA-1 because this is what makes TinyGit byte-compatible with real Git. If I went with SHA-256, then the hash output would be different and defeats one of the main purposes of the project. Note: Git is migrating to SHA-256 in the future, but as of right now it's SHA-1.
-- **Storage format** — Git stores objects two ways: "loose" (one zlib-compressed file per object, the 2/38 sharded layout mentioned earlier) and "packed"(many objects delta-compressed into a single packfile). I chose just to do loose because they're dead simple. All I had to do was write it and verify it. It's one object, one file, hash it, and done. Where packfiles add delta encoding  and an index format that would've been a project on their own.
+- **Storage format** — Git stores objects two ways: "loose" (one zlib-compressed file per object, the 2/38 sharded layout mentioned earlier) and "packed" (many objects delta-compressed into a single packfile). I chose just to do loose because they're dead simple. All I had to do was write it and verify it. It's one object, one file, hash it, and done. Whereas packfiles add delta encoding and an index format that would've been a project on their own.
 - **Scope cuts** — I deliberately left out branching, subdirectories, packfiles, and merge. The reason for this was due to the learning curve flattening with these topics as we start to go into areas that are more engineering work than it is learning. The scope was the object model, the conceptual core of Git, not recursive trees and bookkeeping that would end up as busy work.
   
 ## What I learned
