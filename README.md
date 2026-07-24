@@ -248,7 +248,3 @@ Here are some possible next steps:
 - [ ] `cat-file` — the read path is already built for `log`
 - [ ] `status` — working dir vs index vs HEAD comparison
 - [ ] Branching and merge
-
-## AI Usage
-
-This project was written entirely by me, and me alone. AI was used in the learning process, research, and code review. All code and design were written and designed by me.
